@@ -1,0 +1,521 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Online Code Editor — HTML/CSS/JS Live Preview</title>
+  <style>
+    :root{
+      --bg:#0f1220;
+      --panel:#151a2d;
+      --panel-2:#0d1123;
+      --text:#e7e9f1;
+      --muted:#9aa3b2;
+      --accent:#6ee7b7;
+      --accent-2:#7aa2ff;
+      --danger:#ff6b6b;
+      --border:#252a42;
+      --ok:#22c55e;
+      --warn:#f59e0b;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      background:var(--bg);
+      color:var(--text);
+      font:14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji","Segoe UI Emoji";
+    }
+    .app{
+      display:grid;
+      grid-template-rows:auto 1fr;
+      height:100%;
+      width:100%;
+    }
+    header{
+      display:flex;
+      align-items:center;
+      gap:.5rem;
+      padding:.6rem .8rem;
+      border-bottom:1px solid var(--border);
+      background:linear-gradient(180deg, rgba(255,255,255,.03), transparent);
+    }
+    .title{
+      font-weight:600;
+      letter-spacing:.2px;
+      margin-right:.6rem;
+    }
+    .grow{flex:1}
+    .btn{
+      appearance:none; border:1px solid var(--border); background:var(--panel);
+      color:var(--text); padding:.45rem .65rem; border-radius:.5rem; cursor:pointer;
+    }
+    .btn:hover{border-color:#334; background:#1a2040}
+    .btn.primary{background:var(--accent-2); color:#080c18; border-color:transparent; font-weight:600}
+    .btn.primary:hover{filter:brightness(1.05)}
+    .btn.danger{background:#2a1420; border-color:#3b1a27; color:#ffb4c0}
+    .btn.toggle.active{outline:2px solid var(--accent)}
+    .switch{display:inline-flex; align-items:center; gap:.35rem}
+    .switch input{accent-color:var(--accent)}
+    .hint{color:var(--muted); font-size:12px}
+    main{
+      display:grid; gap:8px; padding:8px;
+      grid-template-columns: minmax(280px, 1fr) minmax(340px, 1.2fr);
+    }
+    .left, .right{
+      height:calc(100vh - 64px);
+      min-height:420px;
+      display:flex; flex-direction:column; gap:8px;
+    }
+    .panel{
+      background:var(--panel); border:1px solid var(--border); border-radius:10px; overflow:hidden;
+      display:flex; flex-direction:column;
+    }
+    .panel .head{
+      display:flex; align-items:center; justify-content:space-between;
+      padding:.45rem .6rem; background:var(--panel-2); border-bottom:1px solid var(--border);
+    }
+    .panel .head .label{font-weight:600; color:#cdd4e6}
+    .editor{
+      flex:1; display:flex; min-height:120px;
+      position:relative;
+    }
+    textarea{
+      width:100%; height:100%;
+      background:#0e1329; color:#e8ebf7; border:0; padding:.75rem .8rem;
+      font:13px/1.5 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace;
+      resize:none; outline:none; tab-size:2;
+    }
+    .right .preview{flex:1; min-height:260px; background:#0b1024}
+    iframe{
+      width:100%; height:100%; border:0; background:#fff; border-radius:0 0 10px 10px;
+    }
+    .console{
+      height:200px; display:flex; flex-direction:column;
+    }
+    .console .log{
+      flex:1; overflow:auto; background:#0b1024; padding:.5rem .6rem; font-family:ui-monospace, monospace;
+      white-space:pre-wrap; word-break:break-word;
+    }
+    .log .line{margin:.2rem 0; padding:.25rem .4rem; border-radius:6px; background:#0e1533}
+    .log .info{border-left:3px solid #60a5fa}
+    .log .warn{border-left:3px solid var(--warn); background:#181833}
+    .log .error{border-left:3px solid var(--danger); background:#1d1420}
+    .log .ok{border-left:3px solid var(--ok)}
+    .row{
+      display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;
+    }
+    .foot{
+      display:flex; align-items:center; justify-content:space-between; padding:.35rem .6rem; border-top:1px solid var(--border); background:var(--panel-2);
+    }
+    .tabs{display:none}
+    @media (max-width: 980px){
+      main{grid-template-columns:1fr}
+      .row{grid-template-columns:1fr}
+      .tabs{display:flex; gap:6px; padding:.35rem .5rem; background:var(--panel-2); border-bottom:1px solid var(--border)}
+      .tab{padding:.3rem .55rem; border:1px solid var(--border); border-radius:6px; cursor:pointer; color:#cbd5e1; background:transparent}
+      .tab.active{background:#1a2040; color:#fff}
+      .stack .pane{display:none}
+      .stack .pane.active{display:flex}
+    }
+    .kbd{
+      font:12px/1.2 ui-monospace, monospace; background:#0f1533; color:#cfe3ff; padding:.14rem .34rem; border:1px solid #1a2250; border-bottom-width:2px; border-radius:4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="title">Online Code Editor</div>
+      <div class="hint">HTML / CSS / JS — Live Preview</div>
+      <div class="grow"></div>
+      <button id="runBtn" class="btn primary" title="Run (Ctrl+Enter)">Run</button>
+      <label class="switch btn toggle" title="Auto Run (Alt+R)">
+        <input id="autoRun" type="checkbox" /> Auto-Run
+      </label>
+      <button id="saveBtn" class="btn" title="Save (Ctrl+S)">Save</button>
+      <button id="loadBtn" class="btn" title="Load last save">Load</button>
+      <button id="shareBtn" class="btn" title="Share link">Share</button>
+      <button id="downloadBtn" class="btn" title="Download combined HTML">Download</button>
+      <button id="resetBtn" class="btn danger" title="Reset boilerplate">Reset</button>
+    </header>
+
+    <main>
+      <section class="left">
+        <div class="panel stack" id="editorPanel">
+          <div class="head">
+            <div class="label">Editors</div>
+            <div class="hint">Tips: <span class="kbd">Ctrl+Enter</span> Run • <span class="kbd">Alt+R</span> Auto • <span class="kbd">Ctrl+L</span> Clear Console</div>
+          </div>
+          <div class="tabs" id="tabs">
+            <button data-target="html" class="tab active">HTML</button>
+            <button data-target="css" class="tab">CSS</button>
+            <button data-target="js" class="tab">JS</button>
+          </div>
+          <div class="row">
+            <div class="panel pane active" data-name="html">
+              <div class="head"><div class="label">HTML</div></div>
+              <div class="editor"><textarea id="htmlEditor"></textarea></div>
+            </div>
+            <div class="panel pane" data-name="css">
+              <div class="head"><div class="label">CSS</div></div>
+              <div class="editor"><textarea id="cssEditor"></textarea></div>
+            </div>
+            <div class="panel pane" data-name="js">
+              <div class="head"><div class="label">JavaScript</div></div>
+              <div class="editor"><textarea id="jsEditor"></textarea></div>
+            </div>
+          </div>
+          <div class="foot">
+            <div class="hint">Note: This combines HTML + <style> + <script> into the preview document. For external libs, paste their CDN tags inside HTML.</div>
+            <div></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="right">
+        <div class="panel preview">
+          <div class="head">
+            <div class="label">Preview</div>
+            <div>
+              <button id="clearConsoleBtn" class="btn" title="Clear console (Ctrl+L)">Clear Console</button>
+              <button id="darkBtn" class="btn" title="Toggle dark mode">Dark Mode</button>
+            </div>
+          </div>
+          <iframe id="frame" sandbox="allow-scripts allow-modals allow-forms allow-pointer-lock allow-same-origin"></iframe>
+        </div>
+        <div class="panel console">
+          <div class="head">
+            <div class="label">Console</div>
+            <div class="hint">Logs and errors from preview</div>
+          </div>
+          <div id="log" class="log" aria-live="polite"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    // Helpers
+    const $ = s => document.querySelector(s);
+    const htmlEl = $('#htmlEditor');
+    const cssEl = $('#cssEditor');
+    const jsEl = $('#jsEditor');
+    const frame = $('#frame');
+    const logEl = $('#log');
+    const runBtn = $('#runBtn');
+    const saveBtn = $('#saveBtn');
+    const loadBtn = $('#loadBtn');
+    const resetBtn = $('#resetBtn');
+    const downloadBtn = $('#downloadBtn');
+    const shareBtn = $('#shareBtn');
+    const autoRunEl = $('#autoRun');
+    const darkBtn = $('#darkBtn');
+
+    const DEFAULT = {
+      html:
+`<main class="wrap">
+  <h1>Online Code Editor</h1>
+  <p>Edit HTML, CSS, JS on the left, then click <strong>Run</strong> or enable <em>Auto-Run</em>.</p>
+  <button id="demoBtn">Click me</button>
+  <p id="out"></p>
+</main>`,
+      css:
+`:root{
+  --c:#111827; --bg:#f8fafc; --p:#2563eb; --card:#ffffff; --muted:#6b7280;
+}
+*{box-sizing:border-box}
+body{margin:0; font:16px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; color:var(--c); background:var(--bg)}
+.wrap{max-width:720px; margin:6vh auto; padding:24px; background:var(--card); border:1px solid #e5e7eb; border-radius:12px; box-shadow:0 10px 30px rgba(2,6,23,.06)}
+h1{margin:0 0 10px; font-size:28px}
+p{margin:0 0 12px; color:var(--muted)}
+button{background:var(--p); color:#fff; border:0; padding:10px 14px; border-radius:10px; cursor:pointer}
+button:hover{filter:brightness(1.05)}`,
+      js:
+`console.info("Editor ready.");
+const btn = document.getElementById("demoBtn");
+const out = document.getElementById("out");
+btn?.addEventListener("click", () => {
+  out.textContent = "Clicked at " + new Date().toLocaleTimeString();
+  console.log({clicked:true, at: Date.now()});
+});
+`
+    };
+
+    function buildSrcdoc(html, css, js){
+      // Console bridge inside iframe -> parent
+      const bridge = `
+<script>
+(function(){
+  function send(kind, payload){
+    try{ parent.postMessage({type:kind, payload}, "*"); }catch(e){}
+  }
+  ["log","info","warn","error"].forEach(function(level){
+    const orig = console[level].bind(console);
+    console[level] = function(){
+      try{
+        const args = Array.from(arguments).map(a => {
+          try{
+            if (typeof a === "string") return a;
+            return JSON.stringify(a, null, 2);
+          }catch(e){ return String(a); }
+        });
+        send("console", { level, msg: args.join(" ") });
+      }catch(e){}
+      orig.apply(console, arguments);
+    }
+  });
+  window.addEventListener("error", function(e){
+    send("console", { level:"error", msg: (e.message||"Error")+" ("+(e.filename||"") + ":" + (e.lineno||0) + ":" + (e.colno||0) + ")" });
+  });
+  window.addEventListener("unhandledrejection", function(e){
+    send("console", { level:"error", msg: "Unhandled promise rejection: " + (e.reason && (e.reason.stack||e.reason.message||e.reason)) });
+  });
+})();
+<\/script>`;
+      return `<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<style>${css||""}</style>
+</head>
+<body>
+${html||""}
+${bridge}
+<script>
+try{
+${js||""}
+}catch(e){
+  console.error(e && (e.stack || e.message) || e);
+}
+<\/script>
+</body>
+</html>`;
+    }
+
+    function run(){
+      const html = htmlEl.value;
+      const css = cssEl.value;
+      const js = jsEl.value;
+      const doc = buildSrcdoc(html, css, js);
+      frame.srcdoc = doc;
+      appendLog("ok","Preview updated.");
+    }
+
+    function appendLog(level, msg){
+      const div = document.createElement('div');
+      div.className = `line ${level}`;
+      div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+      logEl.appendChild(div);
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function clearLog(){
+      logEl.innerHTML = "";
+      appendLog("info", "Console cleared.");
+    }
+
+    window.addEventListener("message", (e)=>{
+      const data = e.data || {};
+      if(data.type === "console"){
+        const { level, msg } = data.payload || {};
+        appendLog(level||"info", String(msg||""));
+      }
+    });
+
+    function save(key="oce-project"){
+      const data = {
+        html: htmlEl.value,
+        css: cssEl.value,
+        js: jsEl.value,
+        dark: document.body.dataset.theme === "dark",
+        auto: autoRunEl.checked,
+        t: Date.now()
+      };
+      localStorage.setItem(key, JSON.stringify(data));
+      appendLog("ok","Saved to localStorage.");
+    }
+
+    function load(key="oce-project"){
+      const raw = localStorage.getItem(key);
+      if(!raw){ appendLog("warn","No saved project found."); return; }
+      try{
+        const data = JSON.parse(raw);
+        htmlEl.value = data.html ?? DEFAULT.html;
+        cssEl.value = data.css ?? DEFAULT.css;
+        jsEl.value = data.js ?? DEFAULT.js;
+        if(typeof data.dark === "boolean") setDark(data.dark);
+        if(typeof data.auto === "boolean") autoRunEl.checked = data.auto;
+        appendLog("ok","Loaded from localStorage.");
+        run();
+      }catch(e){
+        appendLog("error","Failed to load: " + e.message);
+      }
+    }
+
+    function reset(){
+      htmlEl.value = DEFAULT.html;
+      cssEl.value = DEFAULT.css;
+      jsEl.value = DEFAULT.js;
+      appendLog("warn","Reset to boilerplate.");
+      run();
+    }
+
+    function download(filename, content, type="text/html"){
+      const blob = new Blob([content], {type});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(()=>URL.revokeObjectURL(a.href), 2000);
+    }
+
+    function downloadCombined(){
+      const combined = buildSrcdoc(htmlEl.value, cssEl.value, jsEl.value);
+      download("project.html", combined, "text/html");
+      appendLog("ok","Downloaded project.html");
+    }
+
+    function encodeShare(){
+      // Encode project into URL hash using base64 of URI-encoded JSON
+      const obj = {h: htmlEl.value, c: cssEl.value, j: jsEl.value};
+      const json = JSON.stringify(obj);
+      const b64 = btoa(unescape(encodeURIComponent(json)));
+      return "#p=" + b64;
+    }
+
+    function decodeShare(hash){
+      try{
+        const b64 = hash.replace(/^#p=/,'');
+        const json = decodeURIComponent(escape(atob(b64)));
+        const obj = JSON.parse(json);
+        return obj;
+      }catch(e){ return null; }
+    }
+
+    async function share(){
+      const url = location.origin + location.pathname + encodeShare();
+      try{
+        await navigator.clipboard.writeText(url);
+        appendLog("ok","Share link copied to clipboard.");
+      }catch{
+        appendLog("warn","Copy failed. Link placed in console.");
+        appendLog("info", url);
+      }
+    }
+
+    function setDark(on){
+      document.body.dataset.theme = on ? "dark" : "";
+      if(on){
+        // Already themed via CSS variables; toggle just for state
+      }
+      localStorage.setItem("oce-dark", on ? "1" : "0");
+    }
+
+    // Debounce for Auto-Run
+    function debounce(fn, ms){
+      let t; return function(...args){
+        clearTimeout(t); t = setTimeout(()=>fn.apply(this,args), ms);
+      }
+    }
+    const autoRun = debounce(()=>{
+      if(autoRunEl.checked) run();
+    }, 400);
+
+    // Events
+    runBtn.addEventListener("click", run);
+    saveBtn.addEventListener("click", ()=>save());
+    loadBtn.addEventListener("click", ()=>load());
+    resetBtn.addEventListener("click", reset);
+    downloadBtn.addEventListener("click", downloadCombined);
+    shareBtn.addEventListener("click", share);
+    darkBtn.addEventListener("click", ()=>setDark(!(document.body.dataset.theme==="dark")));
+    autoRunEl.addEventListener("change", ()=>{ if(autoRunEl.checked) run(); });
+
+    [htmlEl, cssEl, jsEl].forEach(el=>{
+      el.addEventListener("input", autoRun);
+    });
+
+    // Keyboard shortcuts
+    window.addEventListener("keydown", (e)=>{
+      if(e.ctrlKey && e.key.toLowerCase()==="enter"){ e.preventDefault(); run(); }
+      if(e.ctrlKey && e.key.toLowerCase()==="s"){ e.preventDefault(); save(); }
+      if(e.ctrlKey && e.key.toLowerCase()==="l"){ e.preventDefault(); clearLog(); }
+      if(e.altKey && (e.key.toLowerCase()==="r")){ e.preventDefault(); autoRunEl.checked = !autoRunEl.checked; if(autoRunEl.checked) run(); }
+    });
+
+    $('#clearConsoleBtn').addEventListener('click', clearLog);
+
+    // Mobile tabs
+    const tabs = $('#tabs');
+    const panel = $('#editorPanel');
+    function applyResponsiveTabs(){
+      const isNarrow = window.matchMedia("(max-width: 980px)").matches;
+      tabs.style.display = isNarrow ? "flex" : "none";
+      panel.classList.toggle("stack", isNarrow);
+      if(isNarrow){
+        // ensure one active
+        setActivePane(document.querySelector('.tab.active')?.dataset.target || 'html');
+      }else{
+        // show all panes
+        document.querySelectorAll('.pane').forEach(p=>p.classList.add('active'));
+      }
+    }
+    function setActivePane(name){
+      document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.target===name));
+      document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('active', p.dataset.name===name));
+    }
+    tabs.addEventListener("click", (e)=>{
+      const btn = e.target.closest('.tab');
+      if(!btn) return;
+      setActivePane(btn.dataset.target);
+    });
+    window.addEventListener("resize", applyResponsiveTabs);
+
+    // Init
+    (function init(){
+      // Load theme and auto
+      setDark(localStorage.getItem("oce-dark")==="1");
+      autoRunEl.checked = localStorage.getItem("oce-auto")==="1";
+      autoRunEl.addEventListener("change", ()=>localStorage.setItem("oce-auto", autoRunEl.checked ? "1" : "0"));
+
+      // Try URL share
+      const hash = location.hash || "";
+      let loaded = false;
+      if(/^#p=/.test(hash)){
+        const data = decodeShare(hash);
+        if(data){
+          htmlEl.value = data.h ?? DEFAULT.html;
+          cssEl.value = data.c ?? DEFAULT.css;
+          jsEl.value = data.j ?? DEFAULT.js;
+          loaded = true;
+          appendLog("ok","Loaded from shared link.");
+        }
+      }
+      if(!loaded){
+        // Try saved, else defaults
+        const raw = localStorage.getItem("oce-project");
+        if(raw){
+          try{
+            const d = JSON.parse(raw);
+            htmlEl.value = d.html ?? DEFAULT.html;
+            cssEl.value = d.css ?? DEFAULT.css;
+            jsEl.value = d.js ?? DEFAULT.js;
+            appendLog("ok","Loaded last project.");
+            loaded = true;
+          }catch{}
+        }
+      }
+      if(!loaded){
+        reset();
+      }else{
+        run();
+      }
+      applyResponsiveTabs();
+    })();
+  </script>
+</body>
+</html>
