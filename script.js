@@ -1,5 +1,5 @@
 console.log("script.js loaded");
-const apiKey = "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"; // Warning: Never expose API keys publicly!
+const apiKey = "sk-or-v1-a2046a74eda2324e7ee2f860d65306d362c745b5c254a40c"; // Warning: Never expose API keys publicly!
 
 async function sendMessage() {
   const input = document.getElementById("user-input");
@@ -58,3 +58,4 @@ function appendMessage(sender, text) {
   chatBox.appendChild(messageDiv);
   chatBox.scrollTop = chatBox.scrollHeight;
 }
+
